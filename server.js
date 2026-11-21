@@ -16,7 +16,7 @@ wss.on("connection", (ws) => {
   ws.room = null;
   ws.role = null;
   ws.pid = 0;
-  
+
   ws.on("message", (raw) => {
     const msg = raw.toString();
     if (msg === "HOST") {
@@ -25,7 +25,7 @@ wss.on("connection", (ws) => {
       ws.room = code; ws.role = "host"; ws.pid = 1;
       ws.send(`CREATED|${code}`);
     } else if (msg.startsWith("JOIN|")) {
-      const code = msg.split("|")[1]?.trim().toUpperCase();
+      const code = msg.slice(5).trim().toUpperCase();
       const rm = rooms.get(code);
       if (!rm || rm.guests.size >= 3) { ws.send("ERR|Room not found or full"); return; }
       let pid = 2;
@@ -38,9 +38,10 @@ wss.on("connection", (ws) => {
       const rm = rooms.get(ws.room);
       if (!rm) return;
       if (msg.startsWith("TO|")) {
-        const [, targetId, ...rest] = msg.split("|");
-        const g = rm.guests.get(Number(targetId));
-        if (g && g.readyState === 1) g.send(rest.join("|")); 
+        const parts = msg.split("|");
+        const targetId = Number(parts.at(1));
+        const g = rm.guests.get(targetId);
+        if (g && g.readyState === 1) g.send(parts.slice(2).join("|"));
       } else if (msg.startsWith("BCAST|")) {
         const payload = msg.slice(6);
         for (const g of rm.guests.values()) if (g.readyState === 1) g.send(payload);
@@ -50,7 +51,7 @@ wss.on("connection", (ws) => {
       if (rm && rm.host.readyState === 1) rm.host.send(`FROM|${ws.pid}|${msg}`);
     }
   });
-  
+
   ws.on("close", () => {
     if (!ws.room) return;
     const rm = rooms.get(ws.room);
